@@ -10,8 +10,8 @@ namespace System.Data.SqlClient.ManualTesting.Tests
 {
     public static class DataTestUtility
     {
-        public readonly static string NpConnStr = null;
-        public readonly static string TcpConnStr = null;
+        public static readonly string NpConnStr = null;
+        public static readonly string TcpConnStr = null;
 
         static DataTestUtility()
         {
@@ -20,7 +20,7 @@ namespace System.Data.SqlClient.ManualTesting.Tests
 
             if (!AreConnStringsSetup())
             {
-                Console.WriteLine("WARNING: Test connection strings not defined! Tests cannot be run.");
+                Console.WriteLine("INFO: Test connection strings not defined! Tests cannot be run. Refer README.md of Manual tests for more information. ");
             }
         }
 

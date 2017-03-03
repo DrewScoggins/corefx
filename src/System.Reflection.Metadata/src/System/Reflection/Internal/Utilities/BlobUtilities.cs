@@ -11,7 +11,7 @@ using System.Runtime.InteropServices;
 
 namespace System.Reflection
 {
-    internal unsafe static class BlobUtilities
+    internal static unsafe class BlobUtilities
     {
         public static byte[] ReadBytes(byte* buffer, int byteCount)
         {
@@ -49,15 +49,16 @@ namespace System.Reflection
         {
             fixed (byte* ptr = &buffer[start])
             {
-                *(double*)ptr = value;
+                *(long*)ptr = *(long*)&value;
             }
         }
 
         public static void WriteSingle(this byte[] buffer, int start, float value)
         {
+
             fixed (byte* ptr = &buffer[start])
             {
-                *(float*)ptr = value;
+                *(int*)ptr = *(int*)&value;
             }
         }
 
@@ -225,7 +226,7 @@ namespace System.Reflection
             }
         }
 
-        internal unsafe static int GetUTF8ByteCount(string str)
+        internal static unsafe int GetUTF8ByteCount(string str)
         {
             fixed (char* ptr = str)
             {
@@ -233,7 +234,7 @@ namespace System.Reflection
             }
         }
 
-        internal unsafe static int GetUTF8ByteCount(char* str, int charCount)
+        internal static unsafe int GetUTF8ByteCount(char* str, int charCount)
         {
             char* remainder;
             return GetUTF8ByteCount(str, charCount, int.MaxValue, out remainder);
@@ -318,9 +319,9 @@ namespace System.Reflection
         internal static byte GetUserStringTrailingByte(string str)
         {
             // ECMA-335 II.24.2.4:
-            // This final byte holds the value 1 if and only if any UTF16 character within 
+            // This final byte holds the value 1 if and only if any UTF16 character within
             // the string has any bit set in its top byte, or its low byte is any of the following:
-            // 0x01–0x08, 0x0E–0x1F, 0x27, 0x2D, 0x7F.  Otherwise, it holds 0. 
+            // 0x01–0x08, 0x0E–0x1F, 0x27, 0x2D, 0x7F.  Otherwise, it holds 0.
             // The 1 signifies Unicode characters that require handling beyond that normally provided for 8-bit encoding sets.
 
             foreach (char ch in str)

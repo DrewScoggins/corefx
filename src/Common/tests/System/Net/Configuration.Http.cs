@@ -8,13 +8,17 @@ namespace System.Net.Test.Common
     {
         public static partial class Http
         {
-            private readonly static string DefaultAzureServer = "corefx-net.cloudapp.net";  
+            private static readonly string DefaultAzureServer = "corefx-net.cloudapp.net";  
 
             public static string Host => GetValue("COREFX_HTTPHOST", DefaultAzureServer);
 
             public static string SecureHost => GetValue("COREFX_SECUREHTTPHOST", DefaultAzureServer);
 
             public static string Http2Host => GetValue("COREFX_HTTP2HOST", "http2.akamai.com");
+            
+            // This server doesn't use HTTP/2 server push (push promise) feature. Some HttpClient implementations
+            // don't support servers that use push right now.
+            public static string Http2NoPushHost => GetValue("COREFX_HTTP2NOPUSHHOST", "www.microsoft.com");
 
             public static string DomainJoinedHttpHost => GetValue("COREFX_DOMAINJOINED_HTTPHOST");
 
@@ -46,20 +50,21 @@ namespace System.Net.Test.Common
             private const string DeflateHandler = "Deflate.ashx";
             private const string GZipHandler = "GZip.ashx";
 
-            public readonly static Uri RemoteEchoServer = new Uri("http://" + Host + "/" + EchoHandler);
-            public readonly static Uri SecureRemoteEchoServer = new Uri("https://" + SecureHost + "/" + EchoHandler);
+            public static readonly Uri RemoteEchoServer = new Uri("http://" + Host + "/" + EchoHandler);
+            public static readonly Uri SecureRemoteEchoServer = new Uri("https://" + SecureHost + "/" + EchoHandler);
 
-            public readonly static Uri RemoteVerifyUploadServer = new Uri("http://" + Host + "/" + VerifyUploadHandler);
-            public readonly static Uri SecureRemoteVerifyUploadServer = new Uri("https://" + SecureHost + "/" + VerifyUploadHandler);
+            public static readonly Uri RemoteVerifyUploadServer = new Uri("http://" + Host + "/" + VerifyUploadHandler);
+            public static readonly Uri SecureRemoteVerifyUploadServer = new Uri("https://" + SecureHost + "/" + VerifyUploadHandler);
 
-            public readonly static Uri RemoteEmptyContentServer = new Uri("http://" + Host + "/" + EmptyContentHandler);
-            public readonly static Uri RemoteDeflateServer = new Uri("http://" + Host + "/" + DeflateHandler);
-            public readonly static Uri RemoteGZipServer = new Uri("http://" + Host + "/" + GZipHandler);
+            public static readonly Uri RemoteEmptyContentServer = new Uri("http://" + Host + "/" + EmptyContentHandler);
+            public static readonly Uri RemoteDeflateServer = new Uri("http://" + Host + "/" + DeflateHandler);
+            public static readonly Uri RemoteGZipServer = new Uri("http://" + Host + "/" + GZipHandler);
 
-            public readonly static object[][] EchoServers = { new object[] { RemoteEchoServer }, new object[] { SecureRemoteEchoServer } };
-            public readonly static object[][] VerifyUploadServers = { new object[] { RemoteVerifyUploadServer }, new object[] { SecureRemoteVerifyUploadServer } };
-            public readonly static object[][] CompressedServers = { new object[] { RemoteDeflateServer }, new object[] { RemoteGZipServer } };
-            public readonly static object[][] Http2Servers = { new object[] { new Uri("https://" + Http2Host) } };
+            public static readonly object[][] EchoServers = { new object[] { RemoteEchoServer }, new object[] { SecureRemoteEchoServer } };
+            public static readonly object[][] VerifyUploadServers = { new object[] { RemoteVerifyUploadServer }, new object[] { SecureRemoteVerifyUploadServer } };
+            public static readonly object[][] CompressedServers = { new object[] { RemoteDeflateServer }, new object[] { RemoteGZipServer } };
+            public static readonly object[][] Http2Servers = { new object[] { new Uri("https://" + Http2Host) } };
+            public static readonly object[][] Http2NoPushServers = { new object[] { new Uri("https://" + Http2NoPushHost) } };
 
             public static Uri NegotiateAuthUriForDefaultCreds(bool secure)
             {

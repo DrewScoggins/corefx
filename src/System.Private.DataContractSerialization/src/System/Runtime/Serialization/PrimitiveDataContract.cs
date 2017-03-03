@@ -8,8 +8,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using System.Xml;
-using System.Security;
-
 
 namespace System.Runtime.Serialization
 {
@@ -19,30 +17,21 @@ namespace System.Runtime.Serialization
     internal abstract class PrimitiveDataContract : DataContract
 #endif
     {
-        [SecurityCritical]
-        /// <SecurityNote>
-        /// Critical - holds instance of CriticalHelper which keeps state that is cached statically for serialization. 
-        ///            Static fields are marked SecurityCritical or readonly to prevent
-        ///            data from being modified or leaked to other components in appdomain.
-        /// </SecurityNote>
+        internal static readonly PrimitiveDataContract NullContract = new NullPrimitiveDataContract();
+
         private PrimitiveDataContractCriticalHelper _helper;
 
-        /// <SecurityNote>
-        /// Critical - initializes SecurityCritical field 'helper'
-        /// Safe - doesn't leak anything
-        /// </SecurityNote>
-        [SecuritySafeCritical]
         protected PrimitiveDataContract(Type type, XmlDictionaryString name, XmlDictionaryString ns) : base(new PrimitiveDataContractCriticalHelper(type, name, ns))
         {
             _helper = base.Helper as PrimitiveDataContractCriticalHelper;
         }
 
-        static internal PrimitiveDataContract GetPrimitiveDataContract(Type type)
+        internal static PrimitiveDataContract GetPrimitiveDataContract(Type type)
         {
             return DataContract.GetBuiltInDataContract(type) as PrimitiveDataContract;
         }
 
-        static internal PrimitiveDataContract GetPrimitiveDataContract(string name, string ns)
+        internal static PrimitiveDataContract GetPrimitiveDataContract(string name, string ns)
         {
             return DataContract.GetBuiltInDataContract(name, ns) as PrimitiveDataContract;
         }
@@ -52,51 +41,26 @@ namespace System.Runtime.Serialization
 
         public override XmlDictionaryString TopLevelElementNamespace
         {
-            /// <SecurityNote>
-            /// Critical - for consistency with base class
-            /// Safe - for consistency with base class
-            /// </SecurityNote>
-            [SecuritySafeCritical]
             get
             { return DictionaryGlobals.SerializationNamespace; }
-            /// <SecurityNote>
-            /// Critical - for consistency with base class
-            /// </SecurityNote>
-            [SecurityCritical]
+
             set
             { }
         }
 
-        internal override bool CanContainReferences
-        {
-            get { return false; }
-        }
+        internal override bool CanContainReferences => false;
 
-        internal override bool IsPrimitive
-        {
-            get { return true; }
-        }
+        internal override bool IsPrimitive => true;
 
-        public override bool IsBuiltInDataContract
-        {
-            get
-            {
-                return true;
-            }
-        }
+        public override bool IsBuiltInDataContract => true;
 
         internal MethodInfo XmlFormatWriterMethod
         {
-            /// <SecurityNote>
-            /// Critical - fetches the critical XmlFormatWriterMethod property
-            /// Safe - XmlFormatWriterMethod only needs to be protected for write; initialized in getter if null
-            /// </SecurityNote>
-            [SecuritySafeCritical]
             get
             {
                 if (_helper.XmlFormatWriterMethod == null)
                 {
-                    if (UnderlyingType.GetTypeInfo().IsValueType)
+                    if (UnderlyingType.IsValueType)
                         _helper.XmlFormatWriterMethod = typeof(XmlWriterDelegator).GetMethod(WriteMethodName, Globals.ScanAllMembers, new Type[] { UnderlyingType, typeof(XmlDictionaryString), typeof(XmlDictionaryString) });
                     else
                         _helper.XmlFormatWriterMethod = typeof(XmlObjectSerializerWriteContext).GetMethod(WriteMethodName, Globals.ScanAllMembers, new Type[] { typeof(XmlWriterDelegator), UnderlyingType, typeof(XmlDictionaryString), typeof(XmlDictionaryString) });
@@ -107,16 +71,11 @@ namespace System.Runtime.Serialization
 
         internal MethodInfo XmlFormatContentWriterMethod
         {
-            /// <SecurityNote>
-            /// Critical - fetches the critical XmlFormatContentWriterMethod property
-            /// Safe - XmlFormatContentWriterMethod only needs to be protected for write; initialized in getter if null
-            /// </SecurityNote>
-            [SecuritySafeCritical]
             get
             {
                 if (_helper.XmlFormatContentWriterMethod == null)
                 {
-                    if (UnderlyingType.GetTypeInfo().IsValueType)
+                    if (UnderlyingType.IsValueType)
                         _helper.XmlFormatContentWriterMethod = typeof(XmlWriterDelegator).GetMethod(WriteMethodName, Globals.ScanAllMembers, new Type[] { UnderlyingType });
                     else
                         _helper.XmlFormatContentWriterMethod = typeof(XmlObjectSerializerWriteContext).GetMethod(WriteMethodName, Globals.ScanAllMembers, new Type[] { typeof(XmlWriterDelegator), UnderlyingType });
@@ -127,11 +86,6 @@ namespace System.Runtime.Serialization
 
         internal MethodInfo XmlFormatReaderMethod
         {
-            /// <SecurityNote>
-            /// Critical - fetches the critical XmlFormatReaderMethod property
-            /// Safe - XmlFormatReaderMethod only needs to be protected for write; initialized in getter if null
-            /// </SecurityNote>
-            [SecuritySafeCritical]
             get
             {
                 if (_helper.XmlFormatReaderMethod == null)
@@ -166,11 +120,7 @@ namespace System.Runtime.Serialization
             }
             return false;
         }
-        [SecurityCritical]
-        /// <SecurityNote>
-        /// Critical - holds all state used for (de)serializing primitives.
-        ///            since the data is cached statically, we lock down access to it.
-        /// </SecurityNote>
+
         private class PrimitiveDataContractCriticalHelper : DataContract.DataContractCriticalHelper
         {
             private MethodInfo _xmlFormatWriterMethod;
@@ -229,6 +179,20 @@ namespace System.Runtime.Serialization
             return (context == null) ? reader.ReadElementContentAsChar()
                 : HandleReadValue(reader.ReadElementContentAsChar(), context);
         }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            xmlWriter.WriteChar((char)obj, name, ns);
+        }
+    }
+
+#if NET_NATIVE
+    public class AsmxCharDataContract : CharDataContract
+#else
+    internal class AsmxCharDataContract : CharDataContract
+#endif
+    {
+        internal AsmxCharDataContract() : base(DictionaryGlobals.CharLocalName, DictionaryGlobals.AsmxTypesNamespace) { }
     }
 
 #if NET_NATIVE
@@ -253,6 +217,11 @@ namespace System.Runtime.Serialization
         {
             return (context == null) ? reader.ReadElementContentAsBoolean()
                 : HandleReadValue(reader.ReadElementContentAsBoolean(), context);
+        }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            xmlWriter.WriteBoolean((bool)obj, name, ns);
         }
     }
 
@@ -279,6 +248,11 @@ namespace System.Runtime.Serialization
             return (context == null) ? reader.ReadElementContentAsSignedByte()
                 : HandleReadValue(reader.ReadElementContentAsSignedByte(), context);
         }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            xmlWriter.WriteSignedByte((sbyte)obj, name, ns);
+        }
     }
 
 #if NET_NATIVE
@@ -303,6 +277,11 @@ namespace System.Runtime.Serialization
         {
             return (context == null) ? reader.ReadElementContentAsUnsignedByte()
                 : HandleReadValue(reader.ReadElementContentAsUnsignedByte(), context);
+        }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            xmlWriter.WriteUnsignedByte((byte)obj, name, ns);
         }
     }
 
@@ -329,6 +308,11 @@ namespace System.Runtime.Serialization
             return (context == null) ? reader.ReadElementContentAsShort()
                 : HandleReadValue(reader.ReadElementContentAsShort(), context);
         }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            xmlWriter.WriteShort((short)obj, name, ns);
+        }
     }
 
 #if NET_NATIVE
@@ -353,6 +337,50 @@ namespace System.Runtime.Serialization
         {
             return (context == null) ? reader.ReadElementContentAsUnsignedShort()
                 : HandleReadValue(reader.ReadElementContentAsUnsignedShort(), context);
+        }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            xmlWriter.WriteUnsignedShort((ushort)obj, name, ns);
+        }
+    }
+
+    internal class NullPrimitiveDataContract : PrimitiveDataContract
+    {
+        public NullPrimitiveDataContract() : base(typeof(NullPrimitiveDataContract), DictionaryGlobals.EmptyString, DictionaryGlobals.EmptyString)
+        {
+
+        }
+
+        internal override string ReadMethodName
+        {
+            get
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        internal override string WriteMethodName
+        {
+            get
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        public override void WriteXmlValue(XmlWriterDelegator writer, object obj, XmlObjectSerializerWriteContext context)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override object ReadXmlValue(XmlReaderDelegator reader, XmlObjectSerializerReadContext context)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            throw new NotImplementedException();
         }
     }
 
@@ -379,6 +407,11 @@ namespace System.Runtime.Serialization
             return (context == null) ? reader.ReadElementContentAsInt()
                 : HandleReadValue(reader.ReadElementContentAsInt(), context);
         }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            xmlWriter.WriteInt((int)obj, name, ns);
+        }
     }
 
 #if NET_NATIVE
@@ -403,6 +436,11 @@ namespace System.Runtime.Serialization
         {
             return (context == null) ? reader.ReadElementContentAsUnsignedInt()
                 : HandleReadValue(reader.ReadElementContentAsUnsignedInt(), context);
+        }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            xmlWriter.WriteUnsignedInt((uint)obj, name, ns);
         }
     }
 
@@ -433,6 +471,56 @@ namespace System.Runtime.Serialization
             return (context == null) ? reader.ReadElementContentAsLong()
                 : HandleReadValue(reader.ReadElementContentAsLong(), context);
         }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            xmlWriter.WriteLong((long)obj, name, ns);
+        }
+    }
+
+#if NET_NATIVE
+    public class IntegerDataContract : LongDataContract
+#else
+    internal class IntegerDataContract : LongDataContract
+#endif
+    {
+        internal IntegerDataContract() : base(DictionaryGlobals.integerLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class PositiveIntegerDataContract : LongDataContract
+#else
+    internal class PositiveIntegerDataContract : LongDataContract
+#endif
+    {
+        internal PositiveIntegerDataContract() : base(DictionaryGlobals.positiveIntegerLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class NegativeIntegerDataContract : LongDataContract
+#else
+    internal class NegativeIntegerDataContract : LongDataContract
+#endif
+    {
+        internal NegativeIntegerDataContract() : base(DictionaryGlobals.negativeIntegerLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class NonPositiveIntegerDataContract : LongDataContract
+#else
+    internal class NonPositiveIntegerDataContract : LongDataContract
+#endif
+    {
+        internal NonPositiveIntegerDataContract() : base(DictionaryGlobals.nonPositiveIntegerLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class NonNegativeIntegerDataContract : LongDataContract
+#else
+    internal class NonNegativeIntegerDataContract : LongDataContract
+#endif
+    {
+        internal NonNegativeIntegerDataContract() : base(DictionaryGlobals.nonNegativeIntegerLocalName, DictionaryGlobals.SchemaNamespace) { }
     }
 
 #if NET_NATIVE
@@ -457,6 +545,11 @@ namespace System.Runtime.Serialization
         {
             return (context == null) ? reader.ReadElementContentAsUnsignedLong()
                 : HandleReadValue(reader.ReadElementContentAsUnsignedLong(), context);
+        }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            xmlWriter.WriteUnsignedLong((ulong)obj, name, ns);
         }
     }
 
@@ -483,6 +576,11 @@ namespace System.Runtime.Serialization
             return (context == null) ? reader.ReadElementContentAsFloat()
                 : HandleReadValue(reader.ReadElementContentAsFloat(), context);
         }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            xmlWriter.WriteFloat((float)obj, name, ns);
+        }
     }
 
 #if NET_NATIVE
@@ -507,6 +605,11 @@ namespace System.Runtime.Serialization
         {
             return (context == null) ? reader.ReadElementContentAsDouble()
                 : HandleReadValue(reader.ReadElementContentAsDouble(), context);
+        }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            xmlWriter.WriteDouble((double)obj, name, ns);
         }
     }
 
@@ -533,6 +636,11 @@ namespace System.Runtime.Serialization
             return (context == null) ? reader.ReadElementContentAsDecimal()
                 : HandleReadValue(reader.ReadElementContentAsDecimal(), context);
         }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            xmlWriter.WriteDecimal((decimal)obj, name, ns);
+        }
     }
 
 #if NET_NATIVE
@@ -557,6 +665,11 @@ namespace System.Runtime.Serialization
         {
             return (context == null) ? reader.ReadElementContentAsDateTime()
                 : HandleReadValue(reader.ReadElementContentAsDateTime(), context);
+        }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            xmlWriter.WriteDateTime((DateTime)obj, name, ns);
         }
     }
 
@@ -593,10 +706,187 @@ namespace System.Runtime.Serialization
                 return HandleReadValue(reader.ReadElementContentAsString(), context);
             }
         }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            context.WriteString(xmlWriter, (string)obj, name, ns);
+        }
     }
+
+#if NET_NATIVE
+    public class TimeDataContract : StringDataContract
+#else
+    internal class TimeDataContract : StringDataContract
+#endif
+    {
+        internal TimeDataContract() : base(DictionaryGlobals.timeLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class DateDataContract : StringDataContract
+#else
+    internal class DateDataContract : StringDataContract
+#endif
+    {
+        internal DateDataContract() : base(DictionaryGlobals.dateLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
     internal class HexBinaryDataContract : StringDataContract
     {
         internal HexBinaryDataContract() : base(DictionaryGlobals.hexBinaryLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class GYearMonthDataContract : StringDataContract
+#else
+    internal class GYearMonthDataContract : StringDataContract
+#endif
+    {
+        internal GYearMonthDataContract() : base(DictionaryGlobals.gYearMonthLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class GYearDataContract : StringDataContract
+#else
+    internal class GYearDataContract : StringDataContract
+#endif
+    {
+        internal GYearDataContract() : base(DictionaryGlobals.gYearLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class GMonthDayDataContract : StringDataContract
+#else
+    internal class GMonthDayDataContract : StringDataContract
+#endif
+    {
+        internal GMonthDayDataContract() : base(DictionaryGlobals.gMonthDayLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class GDayDataContract : StringDataContract
+#else
+    internal class GDayDataContract : StringDataContract
+#endif
+    {
+        internal GDayDataContract() : base(DictionaryGlobals.gDayLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class GMonthDataContract : StringDataContract
+#else
+    internal class GMonthDataContract : StringDataContract
+#endif
+    {
+        internal GMonthDataContract() : base(DictionaryGlobals.gMonthLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class NormalizedStringDataContract : StringDataContract
+#else
+    internal class NormalizedStringDataContract : StringDataContract
+#endif
+    {
+        internal NormalizedStringDataContract() : base(DictionaryGlobals.normalizedStringLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class TokenDataContract : StringDataContract
+#else
+    internal class TokenDataContract : StringDataContract
+#endif
+    {
+        internal TokenDataContract() : base(DictionaryGlobals.tokenLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class LanguageDataContract : StringDataContract
+#else
+    internal class LanguageDataContract : StringDataContract
+#endif
+    {
+        internal LanguageDataContract() : base(DictionaryGlobals.languageLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class NameDataContract : StringDataContract
+#else
+    internal class NameDataContract : StringDataContract
+#endif
+    {
+        internal NameDataContract() : base(DictionaryGlobals.NameLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class NCNameDataContract : StringDataContract
+#else
+    internal class NCNameDataContract : StringDataContract
+#endif
+    {
+        internal NCNameDataContract() : base(DictionaryGlobals.NCNameLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class IDDataContract : StringDataContract
+#else
+    internal class IDDataContract : StringDataContract
+#endif
+    {
+        internal IDDataContract() : base(DictionaryGlobals.XSDIDLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class IDREFDataContract : StringDataContract
+#else
+    internal class IDREFDataContract : StringDataContract
+#endif
+    {
+        internal IDREFDataContract() : base(DictionaryGlobals.IDREFLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class IDREFSDataContract : StringDataContract
+#else
+    internal class IDREFSDataContract : StringDataContract
+#endif
+    {
+        internal IDREFSDataContract() : base(DictionaryGlobals.IDREFSLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class ENTITYDataContract : StringDataContract
+#else
+    internal class ENTITYDataContract : StringDataContract
+#endif
+    {
+        internal ENTITYDataContract() : base(DictionaryGlobals.ENTITYLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class ENTITIESDataContract : StringDataContract
+#else
+    internal class ENTITIESDataContract : StringDataContract
+#endif
+    {
+        internal ENTITIESDataContract() : base(DictionaryGlobals.ENTITIESLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class NMTOKENDataContract : StringDataContract
+#else
+    internal class NMTOKENDataContract : StringDataContract
+#endif
+    {
+        internal NMTOKENDataContract() : base(DictionaryGlobals.NMTOKENLocalName, DictionaryGlobals.SchemaNamespace) { }
+    }
+
+#if NET_NATIVE
+    public class NMTOKENSDataContract : StringDataContract
+#else
+    internal class NMTOKENSDataContract : StringDataContract
+#endif
+    {
+        internal NMTOKENSDataContract() : base(DictionaryGlobals.NMTOKENSLocalName, DictionaryGlobals.SchemaNamespace) { }
     }
 
 #if NET_NATIVE
@@ -627,6 +917,13 @@ namespace System.Runtime.Serialization
             {
                 return HandleReadValue(reader.ReadElementContentAsBase64(), context);
             }
+        }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            xmlWriter.WriteStartElement(name, ns);
+            xmlWriter.WriteBase64((byte[])obj);
+            xmlWriter.WriteEndElement();
         }
     }
 
@@ -712,6 +1009,20 @@ namespace System.Runtime.Serialization
             return (context == null) ? reader.ReadElementContentAsTimeSpan()
                 : HandleReadValue(reader.ReadElementContentAsTimeSpan(), context);
         }
+
+        public override void WriteXmlElement(XmlWriterDelegator writer, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            writer.WriteTimeSpan((TimeSpan)obj, name, ns);
+        }
+    }
+
+#if NET_NATIVE
+    public class XsDurationDataContract : TimeSpanDataContract
+#else
+    internal class XsDurationDataContract : TimeSpanDataContract
+#endif
+    {
+        public XsDurationDataContract() : base(DictionaryGlobals.TimeSpanLocalName, DictionaryGlobals.SchemaNamespace) { }
     }
 
 #if NET_NATIVE
@@ -741,6 +1052,20 @@ namespace System.Runtime.Serialization
             return (context == null) ? reader.ReadElementContentAsGuid()
                 : HandleReadValue(reader.ReadElementContentAsGuid(), context);
         }
+
+        public override void WriteXmlElement(XmlWriterDelegator xmlWriter, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            xmlWriter.WriteGuid((Guid)obj, name, ns);
+        }
+    }
+
+#if NET_NATIVE
+    public class AsmxGuidDataContract : GuidDataContract
+#else
+    internal class AsmxGuidDataContract : GuidDataContract
+#endif
+    {
+        internal AsmxGuidDataContract() : base(DictionaryGlobals.GuidLocalName, DictionaryGlobals.AsmxTypesNamespace) { }
     }
 
 #if NET_NATIVE
@@ -771,6 +1096,11 @@ namespace System.Runtime.Serialization
             {
                 return HandleReadValue(reader.ReadElementContentAsUri(), context);
             }
+        }
+
+        public override void WriteXmlElement(XmlWriterDelegator writer, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            writer.WriteUri((Uri)obj, name, ns);
         }
     }
 
@@ -807,6 +1137,11 @@ namespace System.Runtime.Serialization
             {
                 return HandleReadValue(reader.ReadElementContentAsQName(), context);
             }
+        }
+
+        public override void WriteXmlElement(XmlWriterDelegator writer, object obj, XmlObjectSerializerWriteContext context, XmlDictionaryString name, XmlDictionaryString ns)
+        {
+            context.WriteQName(writer, (XmlQualifiedName)obj, name, ns);
         }
 
         internal override void WriteRootElement(XmlWriterDelegator writer, XmlDictionaryString name, XmlDictionaryString ns)

@@ -4,6 +4,7 @@
 
 using System.Collections.Generic;
 using System.Reflection;
+using System.Reflection.Emit;
 using Xunit;
 
 namespace System.Linq.Expressions.Tests
@@ -171,25 +172,44 @@ namespace System.Linq.Expressions.Tests
             Assert.Throws<ArgumentException>("member", () => Expression.ListBind(member, Enumerable.Empty<ElementInit>()));
         }
 
-        [Fact]
-        [ActiveIssue(5963)]
-        public void StaticListProperty()
+        [Theory, ClassData(typeof(CompilationTypes))]
+        public void StaticListProperty(bool useInterpreter)
         {
             PropertyInfo property = typeof(ListWrapper<int>).GetProperty(nameof(ListWrapper<int>.StaticListProperty));
-            MemberInfo member = typeof(ListWrapper<int>).GetMember(nameof(ListWrapper<int>.StaticListProperty))[0];
-            Assert.Throws<ArgumentException>("member", () => Expression.ListBind(property, new ElementInit[0]));
-            Assert.Throws<ArgumentException>("member", () => Expression.ListBind(property, Enumerable.Empty<ElementInit>()));
-            Assert.Throws<ArgumentException>("member", () => Expression.ListBind(member, new ElementInit[0]));
-            Assert.Throws<ArgumentException>("member", () => Expression.ListBind(member, Enumerable.Empty<ElementInit>()));
+            Expression<Func<ListWrapper<int>>> exp = Expression.Lambda<Func<ListWrapper<int>>>(
+                Expression.MemberInit(
+                    Expression.New(typeof(ListWrapper<int>)),
+                    Expression.ListBind(
+                        property,
+                        Expression.ElementInit(
+                            typeof(List<int>).GetMethod(nameof(List<int>.Add)),
+                            Expression.Constant(0)
+                            )
+                        )
+                    )
+                );
+
+            Assert.Throws<InvalidProgramException>(() => exp.Compile(useInterpreter));
         }
 
-        [Fact]
-        [ActiveIssue(5963)]
-        public void StaticListField()
+        [Theory, ClassData(typeof(CompilationTypes))]
+        public void StaticListField(bool useInterpreter)
         {
-            MemberInfo member = typeof(ListWrapper<int>).GetMember(nameof(ListWrapper<int>.StaticListProperty))[0];
-            Assert.Throws<ArgumentException>("member", () => Expression.ListBind(member, new ElementInit[0]));
-            Assert.Throws<ArgumentException>("member", () => Expression.ListBind(member, Enumerable.Empty<ElementInit>()));
+            FieldInfo field = typeof(ListWrapper<int>).GetField(nameof(ListWrapper<int>.StaticListField));
+            Expression<Func<ListWrapper<int>>> exp = Expression.Lambda<Func<ListWrapper<int>>>(
+                Expression.MemberInit(
+                    Expression.New(typeof(ListWrapper<int>)),
+                    Expression.ListBind(
+                        field,
+                        Expression.ElementInit(
+                            typeof(List<int>).GetMethod(nameof(List<int>.Add)),
+                            Expression.Constant(0)
+                            )
+                        )
+                    )
+                );
+
+            Assert.Throws<InvalidProgramException>(() => exp.Compile(useInterpreter));
         }
 
         [Theory, ClassData(typeof(CompilationTypes))]
@@ -212,14 +232,57 @@ namespace System.Linq.Expressions.Tests
         public void UpdateDifferentReturnsDifferent()
         {
             MemberListBinding binding = Expression.ListBind(typeof(ListWrapper<int>).GetProperty(nameof(ListWrapper<int>.ListProperty)), Enumerable.Range(0, 3).Select(i => Expression.ElementInit(typeof(List<int>).GetMethod("Add"), Expression.Constant(i))));
-            Assert.NotSame(binding, binding.Update(new[] {Expression.ElementInit(typeof(List<int>).GetMethod(nameof(List<int>.Add)), Expression.Constant(1))}));
+            Assert.NotSame(binding, binding.Update(new[] { Expression.ElementInit(typeof(List<int>).GetMethod(nameof(List<int>.Add)), Expression.Constant(1)) }));
+        }
+
+        [Fact]
+        public void UpdateDoesntRepeatEnumeration()
+        {
+            MemberListBinding binding = Expression.ListBind(
+                typeof(ListWrapper<int>).GetProperty(nameof(ListWrapper<int>.ListProperty)),
+                Enumerable.Range(0, 3)
+                    .Select(i => Expression.ElementInit(typeof(List<int>).GetMethod("Add"), Expression.Constant(i))));
+            Assert.NotSame(
+                binding,
+                binding.Update(
+                    new RunOnceEnumerable<ElementInit>(
+                        new[]
+                        {
+                            Expression.ElementInit(
+                                typeof(List<int>).GetMethod(nameof(List<int>.Add)), Expression.Constant(1))
+                        })));
+        }
+
+        [Fact]
+        public void UpdateNullThrows()
+        {
+            MemberListBinding binding = Expression.ListBind(
+                typeof(ListWrapper<int>).GetProperty(nameof(ListWrapper<int>.ListProperty)),
+                Enumerable.Range(0, 3)
+                    .Select(i => Expression.ElementInit(typeof(List<int>).GetMethod("Add"), Expression.Constant(i))));
+            Assert.Throws<ArgumentNullException>("initializers", () => binding.Update(null));
         }
 
         [Fact]
         public void UpdateSameReturnsSame()
         {
-            MemberListBinding binding = Expression.ListBind(typeof(ListWrapper<int>).GetProperty(nameof(ListWrapper<int>.ListProperty)), Enumerable.Range(0, 3).Select(i => Expression.ElementInit(typeof(List<int>).GetMethod("Add"), Expression.Constant(i))));
-            Assert.Same(binding, binding.Update(binding.Initializers));
+            ElementInit[] initializers = Enumerable.Range(0, 3)
+                .Select(i => Expression.ElementInit(typeof(List<int>).GetMethod("Add"), Expression.Constant(i)))
+                .ToArray();
+            MemberListBinding binding = Expression.ListBind(
+                typeof(ListWrapper<int>).GetProperty(nameof(ListWrapper<int>.ListProperty)), initializers);
+            Assert.Same(binding, binding.Update(initializers));
+        }
+
+        [Fact]
+        public void GlobalMethod()
+        {
+            ModuleBuilder module = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("Name"), AssemblyBuilderAccess.Run).DefineDynamicModule("Module");
+            MethodBuilder globalMethod = module.DefineGlobalMethod("GlobalMethod", MethodAttributes.Public | MethodAttributes.Static, typeof(List<int>), Type.EmptyTypes);
+            globalMethod.GetILGenerator().Emit(OpCodes.Ret);
+            module.CreateGlobalFunctions();
+            MethodInfo globalMethodInfo = module.GetMethod(globalMethod.Name);
+            Assert.Throws<ArgumentException>("propertyAccessor", () => Expression.ListBind(globalMethodInfo));
         }
     }
 }

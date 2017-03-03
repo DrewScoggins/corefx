@@ -226,7 +226,7 @@ namespace Microsoft.Reflection
         public static bool IsGenericType(this Type type) { return type.IsConstructedGenericType; }
         public static Type BaseType(this Type type) { return type.GetTypeInfo().BaseType; }
         public static Assembly Assembly(this Type type) { return type.GetTypeInfo().Assembly; }
-        public static IEnumerable<PropertyInfo> GetProperties(this Type type) { return type.GetTypeInfo().DeclaredProperties; }
+        public static IEnumerable<PropertyInfo> GetProperties(this Type type) { return type.GetRuntimeProperties(); }
         public static MethodInfo GetGetMethod(this PropertyInfo propInfo) { return propInfo.GetMethod; }
         public static Type[] GetGenericArguments(this Type type) { return type.GenericTypeArguments; }
         
@@ -366,7 +366,7 @@ namespace System
     {
         public static int GetCurrentThreadId()
         {
-            return (int)Interop.mincore.GetCurrentThreadId();
+            return (int)Interop.Kernel32.GetCurrentThreadId();
         }
     }    
 }

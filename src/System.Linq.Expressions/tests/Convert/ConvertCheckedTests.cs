@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Collections.Generic;
 using Xunit;
 
 namespace System.Linq.Expressions.Tests
@@ -7475,7 +7476,7 @@ namespace System.Linq.Expressions.Tests
 
             if (value.HasValue)
             {
-                var unboxed = value.GetValueOrDefault();
+                byte unboxed = value.GetValueOrDefault();
                 if (unboxed > sbyte.MaxValue)
                     Assert.Throws<OverflowException>(() => f());
                 else
@@ -8169,7 +8170,7 @@ namespace System.Linq.Expressions.Tests
 
             if (value.HasValue)
             {
-                var unboxed = value.GetValueOrDefault();
+                char unboxed = value.GetValueOrDefault();
                 if (unboxed > sbyte.MaxValue)
                     Assert.Throws<OverflowException>(() => f());
                 else
@@ -11087,7 +11088,7 @@ namespace System.Linq.Expressions.Tests
 
             if (value.HasValue)
             {
-                var unboxed = value.GetValueOrDefault();
+                E unboxed = value.GetValueOrDefault();
                 if ((int)unboxed < sbyte.MinValue | (int)unboxed > sbyte.MaxValue)
                     Assert.Throws<OverflowException>(() => f());
                 else
@@ -11820,7 +11821,7 @@ namespace System.Linq.Expressions.Tests
 
             if (value.HasValue)
             {
-                var unboxed = value.GetValueOrDefault();
+                El unboxed = value.GetValueOrDefault();
                 if ((long)unboxed < sbyte.MinValue | (long)unboxed > sbyte.MaxValue)
                     Assert.Throws<OverflowException>(() => f());
                 else
@@ -13791,7 +13792,7 @@ namespace System.Linq.Expressions.Tests
 
             if (value.HasValue)
             {
-                var unboxed = value.GetValueOrDefault();
+                int unboxed = value.GetValueOrDefault();
                 if (unboxed < sbyte.MinValue | unboxed > sbyte.MaxValue)
                     Assert.Throws<OverflowException>(() => f());
                 else
@@ -14568,7 +14569,7 @@ namespace System.Linq.Expressions.Tests
 
             if (value.HasValue)
             {
-                var unboxed = value.GetValueOrDefault();
+                long unboxed = value.GetValueOrDefault();
                 if (unboxed < sbyte.MinValue | unboxed > sbyte.MaxValue)
                     Assert.Throws<OverflowException>(() => f());
                 else
@@ -16023,7 +16024,7 @@ namespace System.Linq.Expressions.Tests
 
             if (value.HasValue)
             {
-                var unboxed = value.GetValueOrDefault();
+                short unboxed = value.GetValueOrDefault();
                 if (unboxed < sbyte.MinValue | unboxed > sbyte.MaxValue)
                     Assert.Throws<OverflowException>(() => f());
                 else
@@ -16774,7 +16775,7 @@ namespace System.Linq.Expressions.Tests
 
             if (value.HasValue)
             {
-                var unboxed = value.GetValueOrDefault();
+                uint unboxed = value.GetValueOrDefault();
                 if (unboxed > sbyte.MaxValue)
                     Assert.Throws<OverflowException>(() => f());
                 else
@@ -17554,7 +17555,7 @@ namespace System.Linq.Expressions.Tests
 
             if (value.HasValue)
             {
-                var unboxed = value.GetValueOrDefault();
+                ulong unboxed = value.GetValueOrDefault();
                 if (unboxed > (ulong)sbyte.MaxValue)
                     Assert.Throws<OverflowException>(() => f());
                 else
@@ -18265,7 +18266,7 @@ namespace System.Linq.Expressions.Tests
 
             if (value.HasValue)
             {
-                var unboxed = value.GetValueOrDefault();
+                ushort unboxed = value.GetValueOrDefault();
                 if (unboxed > sbyte.MaxValue)
                     Assert.Throws<OverflowException>(() => f());
                 else
@@ -18397,5 +18398,49 @@ namespace System.Linq.Expressions.Tests
         }
 
         #endregion
+
+        [Fact]
+        public static void OpenGenericnType()
+        {
+            Assert.Throws<ArgumentException>("type", () => Expression.ConvertChecked(Expression.Constant(null), typeof(List<>)));
+        }
+
+        [Fact]
+        public static void TypeContainingGenericParameters()
+        {
+            Assert.Throws<ArgumentException>("type", () => Expression.ConvertChecked(Expression.Constant(null), typeof(List<>.Enumerator)));
+            Assert.Throws<ArgumentException>("type", () => Expression.ConvertChecked(Expression.Constant(null), typeof(List<>).MakeGenericType(typeof(List<>))));
+        }
+
+        [Fact]
+        public static void ByRefType()
+        {
+            Assert.Throws<ArgumentException>("type", () => Expression.ConvertChecked(Expression.Constant(null), typeof(object).MakeByRefType()));
+        }
+
+        [Fact]
+        public static void PointerType()
+        {
+            Assert.Throws<ArgumentException>("type", () => Expression.ConvertChecked(Expression.Constant(null), typeof(int*)));
+        }
+
+        public static IEnumerable<object[]> Conversions()
+        {
+            yield return new object[] { 3, 3 };
+            yield return new object[] { (byte)3, 3 };
+            yield return new object[] { 3, 3.0 };
+            yield return new object[] { 3.0, 3 };
+            yield return new object[] { 24910, (short)24910 };
+        }
+
+        [Theory, PerCompilationType(nameof(Conversions))]
+        public static void ConvertCheckedMakeUnary(object source, object result, bool useInterpreter)
+        {
+            LambdaExpression lambda = Expression.Lambda(
+                Expression.MakeUnary(ExpressionType.ConvertChecked, Expression.Constant(source), result.GetType())
+                );
+            Delegate del = lambda.Compile(useInterpreter);
+            Assert.Equal(result, del.DynamicInvoke());
+        }
     }
 }

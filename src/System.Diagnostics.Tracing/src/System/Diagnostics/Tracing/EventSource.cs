@@ -195,6 +195,8 @@ using Microsoft.Win32;
 
 #if ES_BUILD_STANDALONE
 using EventDescriptor = Microsoft.Diagnostics.Tracing.EventDescriptor;
+#else
+using System.Threading.Tasks;
 #endif
 
 using Microsoft.Reflection;
@@ -1834,7 +1836,7 @@ namespace System.Diagnostics.Tracing
                 dataPointer = data->DataPointer;
                 data++;
                 for (int i = 0; i < cbSize; ++i)
-                    blob[i] = *((byte*)dataPointer);
+                    blob[i] = *((byte*)(dataPointer + i));
                 return blob;
             }
             else if (dataType == typeof(byte*))
@@ -1972,7 +1974,7 @@ namespace System.Diagnostics.Tracing
                                         m_eventData[eventId].Descriptor.Level,
                                         m_eventData[eventId].Descriptor.Opcode,
                                         m_eventData[eventId].Descriptor.Task,
-                                        unchecked((long)(ulong)etwSessions | origKwd));
+                                        unchecked((long)etwSessions.ToEventKeywords() | origKwd));
 
                                     if (!m_provider.WriteEvent(ref desc, pActivityId, childActivityID, args))
                                         ThrowEventSourceException(m_eventData[eventId].Name);
@@ -1993,7 +1995,7 @@ namespace System.Diagnostics.Tracing
                                 // TODO: activity ID support
                                 EventSourceOptions opt = new EventSourceOptions
                                 {
-                                    Keywords = (EventKeywords)unchecked((long)(ulong)etwSessions | origKwd),
+                                    Keywords = (EventKeywords)unchecked((long)etwSessions.ToEventKeywords() | origKwd),
                                     Level = (EventLevel)m_eventData[eventId].Descriptor.Level,
                                     Opcode = (EventOpcode)m_eventData[eventId].Descriptor.Opcode
                                 };
@@ -2058,7 +2060,7 @@ namespace System.Diagnostics.Tracing
         }
 
         [SecurityCritical]
-        unsafe private object[] SerializeEventArgs(int eventId, object[] args)
+        private unsafe object[] SerializeEventArgs(int eventId, object[] args)
         {
             TraceLoggingEventTypes eventTypes = m_eventData[eventId].TraceLoggingEventTypes;
             if (eventTypes == null)
@@ -2115,12 +2117,34 @@ namespace System.Diagnostics.Tracing
 #endif //!ES_BUILD_PCL
         }
 
-        [SecurityCritical]
-        unsafe private void WriteToAllListeners(int eventId, Guid* childActivityID, int eventDataCount, EventSource.EventData* data)
+        private int GetParamLenghtIncludingByteArray(ParameterInfo[] parameters)
         {
-            int paramCount = GetParameterCount(m_eventData[eventId]);
-            
-            if (eventDataCount != paramCount)
+            int sum = 0;
+            foreach(ParameterInfo info in parameters)
+            {
+                if(info.ParameterType == typeof(byte[]))
+                {
+                    sum += 2;
+                }
+                else
+                {
+                    sum++;
+                }
+            }
+
+            return sum;
+        }
+
+        [SecurityCritical]
+        private unsafe void WriteToAllListeners(int eventId, Guid* childActivityID, int eventDataCount, EventSource.EventData* data)
+        {
+            // We represent a byte[] as a integer denoting the length  and then a blob of bytes in the data pointer. This causes a spurious
+            // warning because eventDataCount is off by one for the byte[] case since a byte[] has 2 items associated it. So we want to check
+            // that the number of parameters is correct against the byte[] case, but also we the args array would be one too long if
+            // we just used the modifiedParamCount here -- so we need both.
+            int paramCount = m_eventData[eventId].Parameters.Length;
+            int modifiedParamCount = GetParamLenghtIncludingByteArray(m_eventData[eventId].Parameters);
+            if (eventDataCount != modifiedParamCount)
             {
                 ReportOutOfBandMessage(Resources.GetResourceString("EventSource_EventParametersMismatch", eventId, eventDataCount, paramCount), true);
                 paramCount = Math.Min(paramCount, eventDataCount);
@@ -2136,7 +2160,7 @@ namespace System.Diagnostics.Tracing
 
         // helper for writing to all EventListeners attached the current eventSource.  
         [SecurityCritical]
-        unsafe private void WriteToAllListeners(int eventId, Guid* childActivityID, params object[] args)
+        private unsafe void WriteToAllListeners(int eventId, Guid* childActivityID, params object[] args)
         {
             EventWrittenEventArgs eventCallbackArgs = new EventWrittenEventArgs(this);
             eventCallbackArgs.EventId = eventId;
@@ -2223,7 +2247,7 @@ namespace System.Diagnostics.Tracing
                         SendManifest(manifestBuilder.CreateManifest());
                     }
 
-                    // We use this low level routine to to bypass the enabled checking, since the eventSource itself is only partially inited. 
+                    // We use this low level routine to bypass the enabled checking, since the eventSource itself is only partially inited. 
                     fixed (char* msgStringPtr = msgString)
                     {
                         EventDescriptor descr = new EventDescriptor(0, 0, 0, (byte)level, 0, 0, keywords);
@@ -2287,7 +2311,7 @@ namespace System.Diagnostics.Tracing
 
 #if FEATURE_ACTIVITYSAMPLING
         [SecurityCritical]
-        unsafe private SessionMask GetEtwSessionMask(int eventId, Guid* childActivityID)
+        private unsafe SessionMask GetEtwSessionMask(int eventId, Guid* childActivityID)
         {
             SessionMask etwSessions = new SessionMask();
 
@@ -3129,6 +3153,11 @@ namespace System.Diagnostics.Tracing
                     dataLeft -= chunkSize;
                     dataDescrs[1].Ptr += (uint)chunkSize;
                     envelope.ChunkNumber++;
+                    
+                    // For large manifests we want to not overflow any receiver's buffer. Most manifests will fit within
+                    // 5 chunks, so only the largest manifests will hit the pause.
+                    if((envelope.ChunkNumber % 5) == 0)
+                        Thread.Sleep(15);
                 }
             }
 #endif // FEATURE_MANAGED_ETW
@@ -3230,10 +3259,10 @@ namespace System.Diagnostics.Tracing
                 // are the typenames equal and the namespaces under "Diagnostics.Tracing" (typically
                 // either Microsoft.Diagnostics.Tracing or System.Diagnostics.Tracing)?
                     string.Equals(attributeType.Name, reflectedAttributeType.Name, StringComparison.Ordinal) &&
-                    attributeType.Namespace.EndsWith("Diagnostics.Tracing") &&
-                    (reflectedAttributeType.Namespace.EndsWith("Diagnostics.Tracing")
+                    attributeType.Namespace.EndsWith("Diagnostics.Tracing", StringComparison.Ordinal) &&
+                    (reflectedAttributeType.Namespace.EndsWith("Diagnostics.Tracing", StringComparison.Ordinal)
 #if EVENT_SOURCE_LEGACY_NAMESPACE_SUPPORT
-                     || reflectedAttributeType.Namespace.EndsWith("Diagnostics.Eventing")
+                     || reflectedAttributeType.Namespace.EndsWith("Diagnostics.Eventing", StringComparison.Ordinal)
 #endif
 );
         }
@@ -3794,7 +3823,7 @@ namespace System.Diagnostics.Tracing
         /// <returns>The literal value or -1 if the value could not be determined. </returns>
         [SecuritySafeCritical]
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Maintainability", "CA1502:AvoidExcessiveComplexity", Justification = "Switch statement is clearer than alternatives")]
-        static private int GetHelperCallFirstArg(MethodInfo method)
+        private static int GetHelperCallFirstArg(MethodInfo method)
         {
 #if (!ES_BUILD_PCL && !PROJECTN)
             // Currently searches for the following pattern
@@ -3905,7 +3934,7 @@ namespace System.Diagnostics.Tracing
                             goto default;
                         break;
                     default:
-                        /* Contract.Assert(false, "Warning: User validation code sub-optimial: Unsuported opcode " + instrs[idx] +
+                        /* Contract.Assert(false, "Warning: User validation code sub-optimial: Unsupported opcode " + instrs[idx] +
                             " at " + idx + " in method " + method.Name); */
                         return -1;
                 }
@@ -4096,7 +4125,7 @@ namespace System.Diagnostics.Tracing
         private List<EtwSession> m_legacySessions;      // the legacy ETW sessions listening to this source
         internal long m_keywordTriggers;                // a bit is set if it corresponds to a keyword that's part of an enabled triggering event
         internal SessionMask m_activityFilteringForETWEnabled; // does THIS EventSource have activity filtering turned on for each ETW session
-        static internal Action<Guid> s_activityDying;   // Fires when something calls SetCurrentThreadToActivity()
+        internal static Action<Guid> s_activityDying;   // Fires when something calls SetCurrentThreadToActivity()
         // Also used to mark that activity tracing is on for some case
 #endif // FEATURE_ACTIVITYSAMPLING
 
@@ -4262,7 +4291,7 @@ namespace System.Diagnostics.Tracing
                                 break;
                             if (cur == this)
                             {
-                                // Found our Listener, remove references to to it in the eventSources
+                                // Found our Listener, remove references to it in the eventSources
                                 prev.m_Next = cur.m_Next;       // Remove entry. 
                                 RemoveReferencesToListenerInEventSources(cur);
                                 break;
@@ -4366,7 +4395,7 @@ namespace System.Diagnostics.Tracing
         /// for a particular eventSource to occur BEFORE the OnEventSourceCreated is issued.
         /// </summary>
         /// <param name="eventSource"></param>
-        internal protected virtual void OnEventSourceCreated(EventSource eventSource)
+        protected internal virtual void OnEventSourceCreated(EventSource eventSource)
         {
             EventHandler<EventSourceCreatedEventArgs> callBack = this._EventSourceCreated;
             if(callBack != null)
@@ -4382,7 +4411,7 @@ namespace System.Diagnostics.Tracing
         /// the EventListener has enabled events.  
         /// </summary>
         /// <param name="eventData"></param>
-        internal protected virtual void OnEventWritten(EventWrittenEventArgs eventData)
+        protected internal virtual void OnEventWritten(EventWrittenEventArgs eventData)
         {
             EventHandler<EventWrittenEventArgs> callBack = this.EventWritten;
             if (callBack != null)
@@ -5405,7 +5434,7 @@ namespace System.Diagnostics.Tracing
         /// current activity is active.  
         /// </summary>
         [SecurityCritical]
-        unsafe public static bool PassesActivityFilter(
+        public static unsafe bool PassesActivityFilter(
                                     ActivityFilter filterList,
                                     Guid* childActivityID,
                                     bool triggeringEvent,
@@ -5503,7 +5532,7 @@ namespace System.Diagnostics.Tracing
         /// that the current activity is active.
         /// </summary>
         [SecurityCritical]
-        unsafe public static void FlowActivityIfNeeded(ActivityFilter filterList, Guid* currentActivityId, Guid* childActivityID)
+        public static unsafe void FlowActivityIfNeeded(ActivityFilter filterList, Guid* currentActivityId, Guid* childActivityID)
         {
             Contract.Assert(childActivityID != null);
 
@@ -6581,7 +6610,7 @@ namespace System.Diagnostics.Tracing
                 if (localizedString != null)
                 {
                     value = localizedString;
-                    if (etwFormat && key.StartsWith("event_"))
+                    if (etwFormat && key.StartsWith("event_", StringComparison.Ordinal))
                     {
                         var evtName = key.Substring("event_".Length);
                         value = TranslateToManifestConvention(value, evtName);
