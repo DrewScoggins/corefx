@@ -2201,6 +2201,8 @@ namespace System
         public override int GetHashCode() { throw null; }
         public System.TimeSpan Negate() { throw null; }
         public static System.TimeSpan operator +(System.TimeSpan t1, System.TimeSpan t2) { throw null; }
+        public static double operator /(System.TimeSpan t1, System.TimeSpan t2) { throw null; }
+        public static System.TimeSpan operator /(System.TimeSpan timeSpan, double divisor) { throw null; }
         public static bool operator ==(System.TimeSpan t1, System.TimeSpan t2) { throw null; }
         public static bool operator >(System.TimeSpan t1, System.TimeSpan t2) { throw null; }
         public static bool operator >=(System.TimeSpan t1, System.TimeSpan t2) { throw null; }
@@ -2208,6 +2210,8 @@ namespace System
         public static bool operator <(System.TimeSpan t1, System.TimeSpan t2) { throw null; }
         public static bool operator <=(System.TimeSpan t1, System.TimeSpan t2) { throw null; }
         public static System.TimeSpan operator -(System.TimeSpan t1, System.TimeSpan t2) { throw null; }
+        public static System.TimeSpan operator *(System.TimeSpan timeSpan, double factor) { throw null; }
+        public static System.TimeSpan operator *(double factor, System.TimeSpan timeSpan) { throw null; }
         public static System.TimeSpan operator -(System.TimeSpan t) { throw null; }
         public static System.TimeSpan operator +(System.TimeSpan t) { throw null; }
         public static System.TimeSpan Parse(string s) { throw null; }
@@ -3789,6 +3793,10 @@ namespace System.Collections.Generic
         public KeyNotFoundException(string message) { }
         public KeyNotFoundException(string message, System.Exception innerException) { }
         protected KeyNotFoundException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
+    }
+    public static class KeyValuePair
+    {
+        public static KeyValuePair<TKey, TValue> Create<TKey, TValue>(TKey key, TValue value) { throw null; }        
     }
     [System.Runtime.InteropServices.StructLayoutAttribute(System.Runtime.InteropServices.LayoutKind.Sequential)]
     public partial struct KeyValuePair<TKey, TValue>
@@ -7131,6 +7139,7 @@ namespace System.Text
         public virtual int GetByteCount(char[] chars) { throw null; }
         public abstract int GetByteCount(char[] chars, int index, int count);
         public virtual int GetByteCount(string s) { throw null; }
+        public int GetByteCount(string s, int index, int count) { throw null; }
         [System.CLSCompliantAttribute(false)]
         [System.Security.SecurityCriticalAttribute]
         public unsafe virtual int GetBytes(char* chars, int charCount, byte* bytes, int byteCount) { throw null; }
@@ -7138,6 +7147,7 @@ namespace System.Text
         public virtual byte[] GetBytes(char[] chars, int index, int count) { throw null; }
         public abstract int GetBytes(char[] chars, int charIndex, int charCount, byte[] bytes, int byteIndex);
         public virtual byte[] GetBytes(string s) { throw null; }
+        public byte[] GetBytes(string s, int index, int count) { throw null; }
         public virtual int GetBytes(string s, int charIndex, int charCount, byte[] bytes, int byteIndex) { throw null; }
         [System.CLSCompliantAttribute(false)]
         [System.Security.SecurityCriticalAttribute]

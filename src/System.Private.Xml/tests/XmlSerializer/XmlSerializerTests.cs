@@ -1880,7 +1880,7 @@ string.Format(@"<?xml version=""1.0"" encoding=""utf-8""?>
     }
 
     [Fact]
-    [ActiveIssue("fails when using CodeGen as well")]
+    [ActiveIssue(16752)] //fails when using CodeGen as well
     public static void Xml_BaseClassAndDerivedClass2WithSameProperty()
     {
         var value = new DerivedClassWithSameProperty2() { DateTimeProperty = new DateTime(100, DateTimeKind.Utc), IntProperty = 5, StringProperty = "TestString", ListProperty = new List<string>() };
@@ -2755,11 +2755,11 @@ string.Format(@"<?xml version=""1.0"" encoding=""utf-8""?>
     }
 
     [Fact]
-    [ActiveIssue(15523)]
     public static void SoapEncodedSerialization_IncludeType()
     {
         var soapImporter = new SoapReflectionImporter();
         soapImporter.IncludeType(typeof(MySpecialOrder));
+        soapImporter.IncludeType(typeof(MySpecialOrder2));
         XmlTypeMapping myTypeMapping = soapImporter.ImportTypeMapping(typeof(MyOrder));
         var ser = new XmlSerializer(myTypeMapping);
         var value = new MySpecialOrder()
