@@ -440,7 +440,7 @@ namespace System.Data.SqlClient
                 // Cache physical stateObj and connection.
                 _pMarsPhysicalConObj = _physicalStateObj;
 
-                if(TdsParserStateObjectFactory.useManagedSni) _pMarsPhysicalConObj.IncrementPendingCallbacks();
+                if(TdsParserStateObjectFactory.UseManagedSNI) _pMarsPhysicalConObj.IncrementPendingCallbacks();
 
                 UInt32 info = 0;
                 uint error = _pMarsPhysicalConObj.EnableMars(ref info);
@@ -1167,7 +1167,7 @@ namespace System.Data.SqlClient
             // !=null       | == 0     | replace text left of errorMessage
             //
 
-            if (TdsParserStateObjectFactory.useManagedSni)
+            if (TdsParserStateObjectFactory.UseManagedSNI)
                 Debug.Assert(!string.IsNullOrEmpty(details.errorMessage) || details.sniErrorNumber != 0, "Empty error message received from SNI");
             else
                 Debug.Assert(!string.IsNullOrEmpty(details.errorMessage), "Empty error message received from SNI");
@@ -1209,7 +1209,7 @@ namespace System.Data.SqlClient
             else
             {
 
-                if (TdsParserStateObjectFactory.useManagedSni)
+                if (TdsParserStateObjectFactory.UseManagedSNI)
                 {
                     // SNI error. Append additional error message info if available.
                     //
@@ -5938,11 +5938,8 @@ namespace System.Data.SqlClient
                     Debug.Assert(SniContext.Snix_Login == _physicalStateObj.SniContext, String.Format((IFormatProvider)null, "Unexpected SniContext. Expecting Snix_Login, actual value is '{0}'", _physicalStateObj.SniContext));
                     _physicalStateObj.SniContext = SniContext.Snix_LoginSspi;
 
-                    SSPIData(null, 0, outSSPIBuff, ref outSSPILength);
-                    if (TdsParserStateObjectFactory.useManagedSni)
-                    {
-                        outSSPILength = outSSPIBuff != null ? (uint)outSSPIBuff.Length : 0;
-                    }
+                    SSPIData(null, 0, ref outSSPIBuff, ref outSSPILength);
+                    
                     if (outSSPILength > Int32.MaxValue)
                     {
                         throw SQL.InvalidSSPIPacketSize();  // SqlBu 332503
@@ -6196,19 +6193,19 @@ namespace System.Data.SqlClient
             _physicalStateObj._messageStatus = 0;
         }// tdsLogin
 
-        private void SSPIData(byte[] receivedBuff, UInt32 receivedLength, byte[] sendBuff, ref UInt32 sendLength)
+        private void SSPIData(byte[] receivedBuff, UInt32 receivedLength, ref byte[] sendBuff, ref UInt32 sendLength)
         {
-            SNISSPIData(receivedBuff, receivedLength, sendBuff, ref sendLength);
+            SNISSPIData(receivedBuff, receivedLength, ref sendBuff, ref sendLength);
         }
 
 
-        private void SNISSPIData(byte[] receivedBuff, UInt32 receivedLength, byte[] sendBuff, ref UInt32 sendLength)
+        private void SNISSPIData(byte[] receivedBuff, UInt32 receivedLength, ref byte[] sendBuff, ref UInt32 sendLength)
         {
-            if (TdsParserStateObjectFactory.useManagedSni)
+            if (TdsParserStateObjectFactory.UseManagedSNI)
             {
                 try
                 {
-                    _physicalStateObj.GenerateSspiClientContext(receivedBuff, receivedLength, sendBuff, ref sendLength, _sniSpnBuffer);
+                    _physicalStateObj.GenerateSspiClientContext(receivedBuff, receivedLength, ref sendBuff, ref sendLength, _sniSpnBuffer);
                 }
                 catch (Exception e)
                 {
@@ -6224,7 +6221,7 @@ namespace System.Data.SqlClient
                 }
 
                 // we need to respond to the server's message with SSPI data
-                if (0 != _physicalStateObj.GenerateSspiClientContext(receivedBuff, receivedLength, sendBuff, ref sendLength, _sniSpnBuffer))
+                if (0 != _physicalStateObj.GenerateSspiClientContext(receivedBuff, receivedLength, ref sendBuff, ref sendLength, _sniSpnBuffer))
                 {
                     SSPIError(SQLMessage.SSPIGenerateError(), TdsEnums.GEN_CLIENT_CONTEXT);
                 }
@@ -6249,7 +6246,7 @@ namespace System.Data.SqlClient
 
             // make call for SSPI data
 
-            SSPIData(receivedBuff, (UInt32)receivedLength, sendBuff, ref sendLength);
+            SSPIData(receivedBuff, (UInt32)receivedLength, ref sendBuff, ref sendLength);
 
             // DO NOT SEND LENGTH - TDS DOC INCORRECT!  JUST SEND SSPI DATA!
             _physicalStateObj.WriteByteArray(sendBuff, (int)sendLength, 0);

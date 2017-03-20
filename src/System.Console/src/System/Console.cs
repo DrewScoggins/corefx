@@ -223,10 +223,6 @@ namespace System
             }
             set
             {
-                if (value <= 0)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(value), value, SR.ArgumentOutOfRange_NeedPosNum);
-                }
                 ConsolePal.WindowWidth = value;
             }
         }
@@ -239,10 +235,6 @@ namespace System
             }
             set
             {
-                if (value <= 0)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(value), value, SR.ArgumentOutOfRange_NeedPosNum);
-                }
                 ConsolePal.WindowHeight = value;
             }
         }
